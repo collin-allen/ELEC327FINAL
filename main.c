@@ -231,18 +231,9 @@ int main(void)
     const uint8_t brightness = 0b11100001;
 //    uint8_t current_state[27];
 //    uint8_t next_state[27];
-    unsigned int current_state[7] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0};
-    unsigned int next_state[7] = {0,0,0,0,0,0,0};;
-    uint8_t masks[] = {
-                     0b00000001,
-                     0b00000010,
-                     0b00000100,
-                     0b00001000,
-                     0b00010000,
-                     0b00100000,
-                     0b01000000,
-                     0b10000000,
-    };
+    unsigned int current_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};
+    unsigned int next_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};;
+
     unsigned int x;
     unsigned int div;
     unsigned int mod;
@@ -259,6 +250,8 @@ int main(void)
     unsigned int neighborhood = 0;
     unsigned int n_div32;
     unsigned int n_mod32;
+    unsigned int n_div16;
+    unsigned int n_mod16;
     unsigned int flag = 1;
 
 
@@ -277,8 +270,10 @@ int main(void)
 //    flag0 = flag0 << mod;
 //    current_state[div] = flag0;
     x = 8;
-    div = x >> 5;
-    const int m  = 0x1F;
+    div = (x>>4);
+    //const int m  = 0x1F;
+    const int m = 0xF;
+    const int mask = 0xF;
     flag0 = 1;
     mod = (x&m);
     flag0 = flag0 << mod;
@@ -286,28 +281,28 @@ int main(void)
 
 
     x = 14;
-    div = x >> 5;
+    div = (x>>4);
     mod = (x&m);
     flag0 = 1;
     flag0 = flag0 << mod;
     current_state[div] = current_state[div] | flag0;
 
     x = 21;
-    div = x >> 5;
+    div = (x>>4);
     mod = (x&m);
     flag0 = 1;
     flag0 = flag0 << mod;
     current_state[div] = current_state[div] | flag0;
 
     x = 20;
-    div = x >> 5;
+    div = (x>>4);
     mod = (x&m);
     flag0 = 1;
     flag0 = flag0 << mod;
     current_state[div] = current_state[div] | flag0;
 
     x = 19;
-    div = x >> 5;
+    div = (x>>4);
     mod = (x&m);
     flag0 = 1;
     flag0 = flag0 << mod;
@@ -353,30 +348,44 @@ int main(void)
             UCB0TXBUF = 00000000;
         }
 
+        //flag = 0b01;
         for(j = 0; j<num_leds; j++) {
             for (k = 0; k < 8; k++) {
+                flag = 0b01;
+
                 neighbor = neighbors[j][k];
-                n_div32 = neighbor >> 5;
-                n_mod32 = neighbor%32;
-                flag = flag << n_mod32;
-                neighborhood = current_state[n_div32];
-                neighbor_state = neighborhood & flag;
+                if (j == 14 && neighbor == 8) {
+                    num_on = num_on*2;
+                }
+                n_div16 = (neighbor>>4);
+
+                n_mod16 = (neighbor & mask);
+
+                flag = flag << n_mod16;
+
+                neighborhood = current_state[n_div16];
+
+                neighbor_state = (neighborhood & flag);
+
                 state = (neighbor_state) ? 1:0;
+
                 num_on = num_on + state;
+
             }
 
-            n_div32 = j >> 5;
-            n_mod32 = j%32;
+
+            n_div16 = (j>>4);
+            n_mod16 = (j & mask);
             flag = 1;
-            flag = flag << n_mod32;
+            flag = flag << n_mod16;
 
-            if (num_on >= 2) {
-                next_state[n_div32] = next_state[n_div32] | flag;
+            if (num_on >= 2 && num_on <= 3) {
+                next_state[n_div16] = (next_state[n_div16] | flag);
             } else {
-                next_state[n_div32] = next_state[n_div32] & ~flag;
+                next_state[n_div16] = (next_state[n_div16] & ~flag);
             }
 
-            if (current_state[n_div32] & flag) {
+            if (current_state[n_div16] & flag) {
                 while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
                 UCB0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
                 for (i = 0; i < 3; i++) {
@@ -402,7 +411,7 @@ int main(void)
             UCB0TXBUF = 0b11111111;
         }
 
-        for (i = 0; i < 7; i++) {
+        for (i = 0; i < 14; i++) {
             current_state[i] = next_state[i];
         }
 
