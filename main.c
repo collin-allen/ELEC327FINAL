@@ -21,7 +21,7 @@ const int neighbors[216][8] = {
                                 {7,8,15,20,19,18,17,6},
                                 {6,7,16,19,18,212,213,214},
                                 {17,16,19,28,29,211,212,213},               //18
-                                {16,15,20,27,28,29,18,7},
+                                {16,15,20,27,28,29,18,17},
                                 {15,14,21,26,27,28,19,16},                  //20
                                 {14,13,22,25,26,27,20,15},
                                 {13,12,23,24,25,26,21,14},
@@ -246,7 +246,7 @@ int main(void)
     int state = 0;
     int num_on = 0;
     unsigned int neighbor = 0;
-    int neighbor_state = 0;
+    unsigned int neighbor_state = 0;
     unsigned int neighborhood = 0;
     unsigned int n_div32;
     unsigned int n_mod32;
@@ -280,20 +280,6 @@ int main(void)
     current_state[div] = flag0;
 
 
-    x = 14;
-    div = (x>>4);
-    mod = (x&m);
-    flag0 = 1;
-    flag0 = flag0 << mod;
-    current_state[div] = current_state[div] | flag0;
-
-    x = 21;
-    div = (x>>4);
-    mod = (x&m);
-    flag0 = 1;
-    flag0 = flag0 << mod;
-    current_state[div] = current_state[div] | flag0;
-
     x = 20;
     div = (x>>4);
     mod = (x&m);
@@ -301,51 +287,76 @@ int main(void)
     flag0 = flag0 << mod;
     current_state[div] = current_state[div] | flag0;
 
-    x = 19;
+    x = 15;
     div = (x>>4);
     mod = (x&m);
     flag0 = 1;
     flag0 = flag0 << mod;
     current_state[div] = current_state[div] | flag0;
 
-    int size = sizeof(div);
-    int size2 = sizeof(size);
-    int aa = size + 1;
-    int bb = size2 + 1;
-    //aa = size + 1;
-    if (size == 32 || size2 == 13) {
-        //aa = size + 1;
-        num_on = 218;
-    }
-    if (aa == 34 || bb == 12) {
-        num_on = 217;
-    }
+//    x = 14;
+//    div = (x>>4);
+//    mod = (x&m);
+//    flag0 = 1;
+//    flag0 = flag0 << mod;
+//    current_state[div] = current_state[div] | flag0;
+
+//    x = 19;
+//    div = (x>>4);
+//    mod = (x&m);
+//    flag0 = 1;
+//    flag0 = flag0 << mod;
+//    current_state[div] = current_state[div] | flag0;
+
+//    int size = sizeof(div);
+//    int size2 = sizeof(size);
+//    int aa = size + 1;
+//    int bb = size2 + 1;
+//    //aa = size + 1;
+//    if (size == 32 || size2 == 13) {
+//        //aa = size + 1;
+//        num_on = 218;
+//    }
+//    if (aa == 34 || bb == 12) {
+//        num_on = 217;
+//    }
 
     WDTCTL = WDTPW + WDTHOLD;   // Stop WDT
 
-    P1SEL |= BIT5;                            // 1.5 UCB0CLK
-    P1SEL |= BIT7;                            // UCB0SOMI
+//    P1SEL |= BIT5;                            // 1.5 UCB0CLK
+//    P1SEL |= BIT7;                            // UCB0SOMI
+//
+//    P1SEL2 |= BIT5;                            // 1.5 UCB0CLK, setting p1SEL and p1sel2 both to high uses secondary module
+//    P1SEL2 |= BIT7;                            // UCB0SOMI
 
-    P1SEL2 |= BIT5;                            // 1.5 UCB0CLK, setting p1SEL and p1sel2 both to high uses secondary module
-    P1SEL2 |= BIT7;                            // UCB0SOMI
+    P1DIR |= BIT2 + BIT4;       // Setting P1.2 and 1.4 to output;
+    P1SEL |= BIT2 + BIT4;       // Setting P1.2 and P1.4 to auxillary function
+    P1SEL2 |= BIT2 + BIT4;      // Setting P1.2 and P1.4 to auxillary function
 
-    UCB0CTL1 |= UCSWRST;                      //disables USCI B
-    UCB0CTL0 |= UCMST+UCSYNC+UCMSB;           // 8-bit SPI master, MSb 1st, CPOL=0, CPHS=0
-    UCB0CTL1 |= UCSSEL_2;                     // SMCLK
-    UCB0BR0 = 0x02;                           // Set Frequency
-    UCB0BR1 = 0;
-    UCB0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
 
+//    UCB0CTL1 |= UCSWRST;                      //disables USCI B
+//    UCB0CTL0 |= UCMST+UCSYNC+UCMSB;           // 8-bit SPI master, MSb 1st, CPOL=0, CPHS=0
+//    UCB0CTL1 |= UCSSEL_2;                     // SMCLK
+//    UCB0BR0 = 0x02;                           // Set Frequency
+//    UCB0BR1 = 0;
+//    UCB0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
+    //SPI Master mode setup
+    UCA0CTL1 |= UCSWRST;                            // resetting the settings of USCIB0
+    UCA0CTL0 |= UCCKPH+UCMST+UCSYNC+UCMSB;          // 8-bit SPI mstr, MSb1st, CPOL=0, CPHS=0
+    UCA0CTL1 |= UCSSEL_3;                           // USCIB0 to SMCLK
+    UCA0BR0 = 16;                                   // Set Frequency
+    UCA0BR1 = 0;
+    UCA0CTL1 &= ~UCSWRST;                           // **Initialize USCI state machine**
 
 
 
     while(1)
     {
-        UCB0TXBUF = 0x00;                       // Dummy write to start SPI
+        UCA0TXBUF = 0x00;                       // Dummy write to start SPI
 
         for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
-            UCB0TXBUF = 00000000;
+            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            UCA0TXBUF = 00000000;
         }
 
         //flag = 0b01;
@@ -354,14 +365,12 @@ int main(void)
                 flag = 0b01;
 
                 neighbor = neighbors[j][k];
-                if (j == 14 && neighbor == 8) {
-                    num_on = num_on*2;
-                }
+
                 n_div16 = (neighbor>>4);
 
                 n_mod16 = (neighbor & mask);
 
-                flag = flag << n_mod16;
+                flag = (flag << n_mod16);
 
                 neighborhood = current_state[n_div16];
 
@@ -371,33 +380,36 @@ int main(void)
 
                 num_on = num_on + state;
 
+
             }
 
-
+            //num_on = 3;
             n_div16 = (j>>4);
             n_mod16 = (j & mask);
             flag = 1;
             flag = flag << n_mod16;
 
-            if (num_on >= 2 && num_on <= 3) {
+            if (!(current_state[n_div16] & flag) && num_on == 3){
+                next_state[n_div16] = (next_state[n_div16] | flag);
+            } else if ((current_state[n_div16] & flag) && (num_on == 2 || num_on == 3)) {
                 next_state[n_div16] = (next_state[n_div16] | flag);
             } else {
                 next_state[n_div16] = (next_state[n_div16] & ~flag);
             }
 
             if (current_state[n_div16] & flag) {
-                while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
-                UCB0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
-                    UCB0TXBUF = color[i];
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    UCA0TXBUF = color[i];
                 }
             } else {
-                while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
-                UCB0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
-                    UCB0TXBUF = 0b00000001;
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    UCA0TXBUF = 0b00000001;
                 }
             }
 
@@ -407,8 +419,8 @@ int main(void)
        }
 
         for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCB0RXIFG));            // USCI_B0 RX buffer ready: polling
-            UCB0TXBUF = 0b11111111;
+            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            UCA0TXBUF = 0b11111111;
         }
 
         for (i = 0; i < 14; i++) {
