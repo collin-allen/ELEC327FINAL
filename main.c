@@ -220,39 +220,57 @@ const int neighbors[216][8] = {
                                 {204,137,138,216,5,6,214,205},              //215
 
 };
+
+
+const static int num_leds = 216;
+const static char color[3] = {0x0F, 0x00, 0x00};
+const static char color2[3] = {0x00, 0x0F, 0x00};
+
+const uint8_t brightness = 0b11100001;
+//    uint8_t current_state[27];
+//    uint8_t next_state[27];
+unsigned int current_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};
+unsigned int next_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};;
+
+unsigned int x;
+unsigned int div;
+unsigned int mod;
+unsigned int flag0;
+
+
+unsigned int i;
+unsigned int j;
+unsigned int k;
+int state = 0;
+int num_on = 0;
+unsigned int neighbor = 0;
+unsigned int neighbor_state = 0;
+unsigned int neighborhood = 0;
+unsigned int n_div32;
+unsigned int n_mod32;
+unsigned int n_div16;
+unsigned int n_mod16;
+unsigned int flag = 1;
+const int mask = 0xF;
+
+
+int stop_setup = 0;
+int left = 0;
+int right = 0;
+int up = 0;
+int down = 0;
+int cur_led = 20;
+int on = 0;
+int set_led = 0;
+
+
 /**
  * main.c
  */
 int main(void)
 {
 
-    const static int num_leds = 216;
-    const static char color[3] = {0x0F, 0x00, 0x00};
-    const uint8_t brightness = 0b11100001;
-//    uint8_t current_state[27];
-//    uint8_t next_state[27];
-    unsigned int current_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};
-    unsigned int next_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};;
 
-    unsigned int x;
-    unsigned int div;
-    unsigned int mod;
-    unsigned int flag0;
-
-
-    unsigned int i;
-    unsigned int j;
-    unsigned int k;
-    int state = 0;
-    int num_on = 0;
-    unsigned int neighbor = 0;
-    unsigned int neighbor_state = 0;
-    unsigned int neighborhood = 0;
-    unsigned int n_div32;
-    unsigned int n_mod32;
-    unsigned int n_div16;
-    unsigned int n_mod16;
-    unsigned int flag = 1;
 
 
 //    x = 8;
@@ -269,30 +287,32 @@ int main(void)
 //    //flag0 = mod;
 //    flag0 = flag0 << mod;
 //    current_state[div] = flag0;
-    x = 8;
-    div = (x>>4);
-    //const int m  = 0x1F;
-    const int m = 0xF;
-    const int mask = 0xF;
-    flag0 = 1;
-    mod = (x&m);
-    flag0 = flag0 << mod;
-    current_state[div] = flag0;
 
 
-    x = 20;
-    div = (x>>4);
-    mod = (x&m);
-    flag0 = 1;
-    flag0 = flag0 << mod;
-    current_state[div] = current_state[div] | flag0;
 
-    x = 15;
-    div = (x>>4);
-    mod = (x&m);
-    flag0 = 1;
-    flag0 = flag0 << mod;
-    current_state[div] = current_state[div] | flag0;
+//    x = 8;
+//    div = (x>>4);
+//    //const int m  = 0x1F;
+//    const int m = 0xF;
+//    flag0 = 1;
+//    mod = (x&m);
+//    flag0 = flag0 << mod;
+//    current_state[div] = flag0;
+//
+//
+//    x = 20;
+//    div = (x>>4);
+//    mod = (x&m);
+//    flag0 = 1;
+//    flag0 = flag0 << mod;
+//    current_state[div] = current_state[div] | flag0;
+//
+//    x = 15;
+//    div = (x>>4);
+//    mod = (x&m);
+//    flag0 = 1;
+//    flag0 = flag0 << mod;
+//    current_state[div] = current_state[div] | flag0;
 
 //    x = 14;
 //    div = (x>>4);
@@ -334,6 +354,20 @@ int main(void)
     P1SEL2 |= BIT2 + BIT4;      // Setting P1.2 and P1.4 to auxillary function
 
 
+    //P2IES |= BIT0 + BIT2 + BIT3 + BIT4;
+    P2IES |= BIT0 + BIT4;
+    P2IES &= ~(BIT2 + BIT3);
+    P2REN |= BIT0 + BIT2 + BIT3 + BIT4;
+    P2IE  |= BIT0 + BIT2 + BIT3 + BIT4;
+    P2IFG &= ~(BIT0 + BIT2 + BIT3 + BIT4);
+    P2DIR &= ~(BIT0 + BIT2 + BIT3 + BIT4);
+
+    P1IES &= ~BIT6;
+    P1REN |= BIT6;
+    P1IE  |= BIT6;
+    P1IFG &= ~(BIT6);
+    P1DIR &= ~(BIT6);
+
 //    UCB0CTL1 |= UCSWRST;                      //disables USCI B
 //    UCB0CTL0 |= UCMST+UCSYNC+UCMSB;           // 8-bit SPI master, MSb 1st, CPOL=0, CPHS=0
 //    UCB0CTL1 |= UCSSEL_2;                     // SMCLK
@@ -350,8 +384,124 @@ int main(void)
 
 
 
-    while(1)
-    {
+    __bis_SR_register(GIE);
+
+
+
+    for (i = 0; i < 4; i++) {
+        while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+        UCA0TXBUF = 00000000;
+    }
+    for (j = 0; j < num_leds; j++) {
+        while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+        UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+        for (i = 0; i < 3; i++) {
+            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            UCA0TXBUF = color[i];
+            //UCA0TXBUF = 0b00000001;
+        }
+    }
+    for (i = 0; i < 4; i++) {
+        while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+        UCA0TXBUF = 0b11111111;
+    }
+    // initial set up
+    while (!stop_setup) {
+
+        if (set_led) {
+            flag = 0b01;
+            n_div16 = (cur_led>>4);
+            n_mod16 = (cur_led & mask);
+            flag = flag << n_mod16;
+            current_state[n_div16] = current_state[n_div16] | flag;
+        }
+        set_led = 0;
+
+
+        if (left) {
+            cur_led = neighbors[cur_led][6];
+        } else if (right) {
+            cur_led = neighbors[cur_led][2];
+        } else if (up) {
+            cur_led = neighbors[cur_led][0];
+        } else if (down) {
+            cur_led = neighbors[cur_led][4];
+        }
+        left = 0;
+        right = 0;
+        up = 0;
+        down = 0;
+
+
+        for (i = 0; i < 4; i++) {
+            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            UCA0TXBUF = 00000000;
+        }
+
+        for (j = 0; j < num_leds; j++) {
+            flag = 0b01;
+            n_div16 = (j>>4);
+            n_mod16 = (j & mask);
+            flag = flag << n_mod16;
+
+            n_div16 = (j>>4);
+            n_mod16 = (j & mask);
+            flag = 1;
+            flag = flag << n_mod16;
+
+            on = current_state[n_div16] & flag;
+            UCA0TXBUF = 0x00;                       // Dummy write to start SPI
+
+
+
+            if (j == cur_led) {
+                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                for (i = 0; i < 3; i++) {
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    UCA0TXBUF = color2[i];
+                }
+            } else if (on) {
+                //current_state[n_div16] = (current_state[n_div16] | flag);
+                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                for (i = 0; i < 3; i++) {
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    UCA0TXBUF = color[i];
+                }
+            } else {
+                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                for (i = 0; i < 3; i++) {
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    //UCA0TXBUF = color[i];
+                    UCA0TXBUF = 0b00000001;
+                }
+            }
+        }
+
+        for (i = 0; i < 4; i++) {
+            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            UCA0TXBUF = 0b11111111;
+        }
+
+
+        //__bis_SR_register(LPM0_bits + GIE);   // Enter LPM0 w/interrupt
+
+    }
+
+    model_life();
+
+
+
+
+    return 0;
+}
+
+
+void
+model_life() {
+    while(1) {
         UCA0TXBUF = 0x00;                       // Dummy write to start SPI
 
         for (i = 0; i < 4; i++) {
@@ -431,9 +581,54 @@ int main(void)
         __delay_cycles(10000);
 
     }
-
-
-    return 0;
 }
 
+#pragma vector=PORT2_VECTOR
+__interrupt void Port_2 (void)
+{
+    //button1 is left   S4      pin 12  P2.4
+    //button2 is down   S3      pin 11  P2.3
+    //button3 is middle S5      pin 14  P1.6
+    //button4 is top    S1      pin 8   P2.0
+    //button5 is right  S2      pin 10  P2.2
+
+    // check if button 1 is pressed
+    if ((P2IFG & BIT0) && (P2IFG & BIT2) && (P2IFG & BIT3) && (P2IFG & BIT4)) {
+        __delay_cycles(100);
+        stop_setup = 1;
+    } else {
+
+        if (P2IFG & BIT0) {
+            __delay_cycles(100);
+            up = 1;
+        }
+        // check if button 1 is pressed
+        if (P2IFG & BIT2) {
+            __delay_cycles(100);
+            right = 1;
+        }
+        // check if button 1 is pressed
+        if (P2IFG & BIT3) {
+            __delay_cycles(100);
+            down = 1;
+        }
+        // check if button 1 is pressed
+        if (P2IFG & BIT4) {
+            __delay_cycles(100);
+            left = 1;
+        }
+    }
+    P2IFG = 0;
+    __bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
+}
+
+#pragma vector=PORT1_VECTOR
+__interrupt void Port_1 (void)
+{
+    if (P1IFG & BIT6) {
+        set_led = 1;
+    }
+    P1IFG = 0;
+    __bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
+}
 
