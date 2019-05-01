@@ -227,10 +227,8 @@ const static char color[3] = {0x0F, 0x00, 0x00};
 const static char color2[3] = {0x00, 0x0F, 0x00};
 
 const uint8_t brightness = 0b11100001;
-//    uint8_t current_state[27];
-//    uint8_t next_state[27];
-unsigned int current_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};
-unsigned int next_state[14] = {0x0,0x0,0x0,0x0,0x0,0x0,0x0, 0x0,0x0,0x0,0x0,0x0,0x0,0x0};;
+unsigned int current_state[14]  = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0};
+unsigned int next_state[14]     = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0};;
 
 unsigned int x;
 unsigned int div;
@@ -238,33 +236,38 @@ unsigned int mod;
 unsigned int flag0;
 
 static int cycles = -1;             // variable can be set to wait timer 1 cycles
-//int first_press = 1;
 int idle = 30000;
 
+// iterators
 unsigned int i;
 unsigned int j;
 unsigned int k;
+
 int state = 0;
-int num_on = 0;
+int num_neighbors = 0;      // number of neighboring LEDs that are on
+
+// values used to determine the state of the neighbors
 unsigned int neighbor = 0;
 unsigned int neighbor_state = 0;
 unsigned int neighborhood = 0;
-unsigned int n_div32;
-unsigned int n_mod32;
+
+// values used to index into the state arrays
 unsigned int n_div16;
 unsigned int n_mod16;
 unsigned int flag = 1;
-const int mask = 0xF;
+const int mask = 0xF;   // mask to perform modular 16 arithmetic
 
-
+// booleans used for control flow
 int stop_setup = 0;
 int left = 0;
 int right = 0;
 int up = 0;
 int down = 0;
-int cur_led = 20;
 int on = 0;
 int set_led = 0;
+
+// index of current led in the chain potentially being selected
+int cur_led = 20;
 
 
 /**
@@ -272,99 +275,21 @@ int set_led = 0;
  */
 int main(void)
 {
-
-
-
-
-//    x = 8;
-//    div = x >> 5;
-//    //mod = x%32;
-//    const int m  = 0x1F;
-//    if (m == 0) {
-//        div = 21;
-//    }
-//    flag0 = 1;
-//    mod = (x&m);
-//    //mod = (x&m);
-//    flag0 = 0b01;
-//    //flag0 = mod;
-//    flag0 = flag0 << mod;
-//    current_state[div] = flag0;
-
-
-
-//    x = 8;
-//    div = (x>>4);
-//    //const int m  = 0x1F;
-//    const int m = 0xF;
-//    flag0 = 1;
-//    mod = (x&m);
-//    flag0 = flag0 << mod;
-//    current_state[div] = flag0;
-//
-//
-//    x = 20;
-//    div = (x>>4);
-//    mod = (x&m);
-//    flag0 = 1;
-//    flag0 = flag0 << mod;
-//    current_state[div] = current_state[div] | flag0;
-//
-//    x = 15;
-//    div = (x>>4);
-//    mod = (x&m);
-//    flag0 = 1;
-//    flag0 = flag0 << mod;
-//    current_state[div] = current_state[div] | flag0;
-
-//    x = 14;
-//    div = (x>>4);
-//    mod = (x&m);
-//    flag0 = 1;
-//    flag0 = flag0 << mod;
-//    current_state[div] = current_state[div] | flag0;
-
-//    x = 19;
-//    div = (x>>4);
-//    mod = (x&m);
-//    flag0 = 1;
-//    flag0 = flag0 << mod;
-//    current_state[div] = current_state[div] | flag0;
-
-//    int size = sizeof(div);
-//    int size2 = sizeof(size);
-//    int aa = size + 1;
-//    int bb = size2 + 1;
-//    //aa = size + 1;
-//    if (size == 32 || size2 == 13) {
-//        //aa = size + 1;
-//        num_on = 218;
-//    }
-//    if (aa == 34 || bb == 12) {
-//        num_on = 217;
-//    }
-
     WDTCTL = WDTPW + WDTHOLD;   // Stop WDT
-
-//    P1SEL |= BIT5;                            // 1.5 UCB0CLK
-//    P1SEL |= BIT7;                            // UCB0SOMI
-//
-//    P1SEL2 |= BIT5;                            // 1.5 UCB0CLK, setting p1SEL and p1sel2 both to high uses secondary module
-//    P1SEL2 |= BIT7;                            // UCB0SOMI
 
     P1DIR |= BIT2 + BIT4;       // Setting P1.2 and 1.4 to output;
     P1SEL |= BIT2 + BIT4;       // Setting P1.2 and P1.4 to auxillary function
     P1SEL2 |= BIT2 + BIT4;      // Setting P1.2 and P1.4 to auxillary function
 
 
-    TA1CTL = TASSEL_2 + MC_1;           // Sets Timer A Control value to up mode and the clock source to ACLK
-    TA1CCTL1 = OUTMOD_7;                // set/reset mode
-    TA1CCTL0 = CCIE;
-    P2DIR |= BIT1 + BIT5;                            // Set P2.1 to output direction
-    P2OUT &= ~BIT5;
-    P2SEL |= BIT1;                            // Set P2.1 to the proper mode for PWM
-    TA1CCR0 = 142;                         // Sets the period at 100 Hz
-    TA1CCR1 = 0;
+//    TA1CTL = TASSEL_2 + MC_1;           // Sets Timer A Control value to up mode and the clock source to ACLK
+//    TA1CCTL1 = OUTMOD_7;                // set/reset mode
+//    TA1CCTL0 = CCIE;
+//    P2DIR |= BIT1 + BIT5;                            // Set P2.1 to output direction
+//    P2OUT &= ~BIT5;
+//    P2SEL |= BIT1;                            // Set P2.1 to the proper mode for PWM
+//    TA1CCR0 = 142;                         // Sets the period at 100 Hz
+//    TA1CCR1 = 0;
 
     //P2IES |= BIT0 + BIT2 + BIT3 + BIT4;
     P2IES |= BIT0 + BIT4;
@@ -380,12 +305,6 @@ int main(void)
     P1IFG &= ~(BIT6);
     P1DIR &= ~(BIT6);
 
-//    UCB0CTL1 |= UCSWRST;                      //disables USCI B
-//    UCB0CTL0 |= UCMST+UCSYNC+UCMSB;           // 8-bit SPI master, MSb 1st, CPOL=0, CPHS=0
-//    UCB0CTL1 |= UCSSEL_2;                     // SMCLK
-//    UCB0BR0 = 0x02;                           // Set Frequency
-//    UCB0BR1 = 0;
-//    UCB0CTL1 &= ~UCSWRST;                     // **Initialize USCI state machine**
     //SPI Master mode setup
     UCA0CTL1 |= UCSWRST;                            // resetting the settings of USCIB0
     UCA0CTL0 |= UCCKPH+UCMST+UCSYNC+UCMSB;          // 8-bit SPI mstr, MSb1st, CPOL=0, CPHS=0
@@ -400,36 +319,20 @@ int main(void)
 
 
 
-    for (i = 0; i < 4; i++) {
-        while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-        UCA0TXBUF = 00000000;
-    }
-    for (j = 0; j < num_leds; j++) {
-        while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-        UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
-        for (i = 0; i < 3; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-            UCA0TXBUF = color[i];
-            //UCA0TXBUF = 0b00000001;
-        }
-    }
-    for (i = 0; i < 4; i++) {
-        while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-        UCA0TXBUF = 0b11111111;
-    }
     // initial set up
     while (!stop_setup) {
 
+        // check if current led should be set
         if (set_led) {
-            flag = 0b01;
-            n_div16 = (cur_led>>4);
-            n_mod16 = (cur_led & mask);
-            flag = flag << n_mod16;
-            current_state[n_div16] = current_state[n_div16] | flag;
+            n_div16 = (cur_led>>4);     // divide by 16 to get index in state array
+            n_mod16 = (cur_led & mask); // modular 16 to get bit in specific value of state array
+            flag = 0b01;                // initialize position index to single bit
+            flag = flag << n_mod16;     // shift single bit to correct position
+            current_state[n_div16] = current_state[n_div16] | flag; // access specific bit in state array
         }
-        set_led = 0;
+        set_led = 0;    // set boolean back to 0
 
-
+        // check booleans set by interrupts for moving the selecting LED
         if (left) {
             cur_led = neighbors[cur_led][6];
         } else if (right) {
@@ -439,66 +342,62 @@ int main(void)
         } else if (down) {
             cur_led = neighbors[cur_led][4];
         }
+
+        // set boolean fields back to 0
         left = 0;
         right = 0;
         up = 0;
         down = 0;
 
 
+        // Send start signal to LED chain
+        UCA0TXBUF = 0x00;                       // Dummy write to start SPI
         for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
             UCA0TXBUF = 00000000;
         }
 
+        // iterate over every LED
         for (j = 0; j < num_leds; j++) {
-            flag = 0b01;
-            n_div16 = (j>>4);
-            n_mod16 = (j & mask);
-            flag = flag << n_mod16;
+            n_div16 = (j>>4);       // divide by 16 to get index into state array
+            n_mod16 = (j & mask);   // mod by 16 to get bit position in value of state array
+            flag = 0b01;            // set position index to single bit
+            flag = flag << n_mod16; // move single bit to correct position
 
-            n_div16 = (j>>4);
-            n_mod16 = (j & mask);
-            flag = 1;
-            flag = flag << n_mod16;
-
-            on = current_state[n_div16] & flag;
-            UCA0TXBUF = 0x00;                       // Dummy write to start SPI
+            on = current_state[n_div16] & flag; // get bit of LED in state array
 
 
-
-            if (j == cur_led) {
-                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+            if (j == cur_led) {     // check if the iterating index is the selecting LED
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                    UCA0TXBUF = color2[i];
+                    while (!(IFG2 & UCA0TXIFG));        // USCI_A0 RX buffer ready: polling
+                    UCA0TXBUF = color2[i];              // give the LED the second color
                 }
-            } else if (on) {
-                //current_state[n_div16] = (current_state[n_div16] | flag);
-                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+            } else if (on) {        // If the LED should be on turn it on
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    while (!(IFG2 & UCA0TXIFG));        // USCI_A0 RX buffer ready: polling
                     UCA0TXBUF = color[i];
                 }
-            } else {
-                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+            } else {                // LED should be off so turn it off
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                    //UCA0TXBUF = color[i];
-                    UCA0TXBUF = 0b00000001;
+                    while (!(IFG2 & UCA0TXIFG));        // USCI_A0 RX buffer ready: polling
+                    UCA0TXBUF = 0b00000001;             // turn LED off
                 }
             }
         }
 
         for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
             UCA0TXBUF = 0b11111111;
         }
 
 
-        //__bis_SR_register(LPM0_bits + GIE);   // Enter LPM0 w/interrupt
+        __bis_SR_register(LPM0_bits + GIE);   // Enter LPM0 w/interrupt
 
     }
 
@@ -517,7 +416,7 @@ model_life() {
         UCA0TXBUF = 0x00;                       // Dummy write to start SPI
 
         for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
             UCA0TXBUF = 00000000;
         }
 
@@ -540,48 +439,48 @@ model_life() {
 
                 state = (neighbor_state) ? 1:0;
 
-                num_on = num_on + state;
+                num_neighbors = num_neighbors + state;
 
 
             }
 
-            //num_on = 3;
+            //num_neighbors = 3;
             n_div16 = (j>>4);
             n_mod16 = (j & mask);
             flag = 1;
             flag = flag << n_mod16;
 
-            if (!(current_state[n_div16] & flag) && num_on == 3){
+            if (!(current_state[n_div16] & flag) && num_neighbors == 3){
                 next_state[n_div16] = (next_state[n_div16] | flag);
-            } else if ((current_state[n_div16] & flag) && (num_on == 2 || num_on == 3)) {
+            } else if ((current_state[n_div16] & flag) && (num_neighbors == 2 || num_neighbors == 3)) {
                 next_state[n_div16] = (next_state[n_div16] | flag);
             } else {
                 next_state[n_div16] = (next_state[n_div16] & ~flag);
             }
 
             if (current_state[n_div16] & flag) {
-                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
                     UCA0TXBUF = color[i];
                 }
             } else {
-                while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time, hence the decision to use char arrays
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
                 for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
                     UCA0TXBUF = 0b00000001;
                 }
             }
 
 
-            num_on = 0;
+            num_neighbors = 0;
             flag = 1;
        }
 
         for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_B0 RX buffer ready: polling
+            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
             UCA0TXBUF = 0b11111111;
         }
 
@@ -605,7 +504,7 @@ __interrupt void Port_2 (void)
     //button5 is right  S2      pin 10  P2.2
 
     // check if button 1 is pressed
-    cycles = idle;
+    //cycles = idle;
     if ((P2IFG & BIT0) && (P2IFG & BIT2) && (P2IFG & BIT3) && (P2IFG & BIT4)) {
         __delay_cycles(100);
         stop_setup = 1;
@@ -662,25 +561,25 @@ __interrupt void Port_1 (void)
 }
 
 
-// Timer A0 interrupt service routine
-#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
-#pragma vector=TIMER1_A0_VECTOR
-__interrupt void Timer_A (void)
-#elif defined(__GNUC__)
-void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) Timer_A (void)
-#else
-#error Compiler not supported!
-#endif
-{
-    // cycles is used as a delay, decrements every time isr is called until cycles = 0 then
-    //      takes the cpu out of low power mode
-    if (cycles > 0) {
-        --cycles;
-    } else if (cycles == 0) {
-        //__bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
-        --cycles;
-        //stop_setup = 1;
-    }
-
-}
+//// Timer A0 interrupt service routine
+//#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+//#pragma vector=TIMER1_A0_VECTOR
+//__interrupt void Timer_A (void)
+//#elif defined(__GNUC__)
+//void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) Timer_A (void)
+//#else
+//#error Compiler not supported!
+//#endif
+//{
+//    // cycles is used as a delay, decrements every time isr is called until cycles = 0 then
+//    //      takes the cpu out of low power mode
+//    if (cycles > 0) {
+//        --cycles;
+//    } else if (cycles == 0) {
+//        //__bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
+//        --cycles;
+//        //stop_setup = 1;
+//    }
+//
+//}
 
