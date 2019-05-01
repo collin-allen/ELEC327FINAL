@@ -1,6 +1,7 @@
 #include <msp430.h>
 #include "stdint.h"
 
+
 const int neighbors[216][8] = {
                                 {143,216,144,145,11,10,1,142},   //0
                                 {142,143,0,11,10,9,2,141},       // 1
@@ -226,7 +227,7 @@ const static int num_leds = 216;
 const static char color[3] = {0x0F, 0x00, 0x00};
 const static char color2[3] = {0x00, 0x0F, 0x00};
 
-const uint8_t brightness = 0b11100001;
+const uint8_t brightness = 0b11100111;
 unsigned int current_state[14]  = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0};
 unsigned int next_state[14]     = {0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0};;
 
@@ -268,6 +269,8 @@ int set_led = 0;
 
 // index of current led in the chain potentially being selected
 int cur_led = 20;
+
+
 
 
 void
@@ -330,7 +333,7 @@ model_life() {
                 }
             } else {    // if the cell is dead turn the LED off
                 while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
+                UCA0TXBUF = 0b11100001;                 //Buffer can hold/send 1 byte at a time
                 for (i = 0; i < 3; i++) {
                     while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
                     UCA0TXBUF = 0b00000001;
@@ -358,6 +361,7 @@ model_life() {
  */
 int main(void)
 {
+
     WDTCTL = WDTPW + WDTHOLD;   // Stop WDT
 
     P1DIR |= BIT2 + BIT4;       // Setting P1.2 and 1.4 to output;
@@ -385,6 +389,7 @@ int main(void)
     //P1IES &= ~BIT6;
     P1IES |= BIT6;
     P1REN |= BIT6;
+    //P1REN &= ~BIT6;
     P1IE  |= BIT6;
     P1IFG &= ~(BIT6);
     P1DIR &= ~(BIT6);
@@ -397,10 +402,23 @@ int main(void)
     UCA0BR1 = 0;
     UCA0CTL1 &= ~UCSWRST;                           // **Initialize USCI state machine**
 
+    int s = 15;
+    unsigned int setup[] = {8, 15, 20, 51, 55, 56, 57, 89, 88, 87, 80, 76, 102, 113, 180, 128, 129, 130, 135, 133, 140, 141, 142,
+        196, 198, 199, 200, 166, 169, 178, 163, 172, 165, 151, 152, 153};
+
+    for (j = 0; j < sizeof(setup)/sizeof(unsigned int); j++) {
+        x = setup[j];
+        div = (x>>4);
+        //const int m  = 0x1F;
+        const int m = 0xF;
+        flag0 = 1;
+        mod = (x&m);
+        flag0 = flag0 << mod;
+        current_state[div] = current_state[div] | flag0;
+    }
 
 
     __bis_SR_register(GIE);
-
 
 
     // initial set up
@@ -507,30 +525,25 @@ __interrupt void Port_2 (void)
 
     // check if button 1 is pressed
     cycles = idle;
-    if ((P2IFG & BIT0) && (P2IFG & BIT2) && (P2IFG & BIT3) && (P2IFG & BIT4)) {
-        __delay_cycles(100);
-        stop_setup = 1;
-    } else {
 
-        if (P2IFG & BIT0) {
-            __delay_cycles(100);
-            up = 1;
-        }
-        // check if button 1 is pressed
-        if (P2IFG & BIT2) {
-            __delay_cycles(100);
-            right = 1;
-        }
-        // check if button 1 is pressed
-        if (P2IFG & BIT3) {
-            __delay_cycles(100);
-            down = 1;
-        }
-        // check if button 1 is pressed
-        if (P2IFG & BIT4) {
-            __delay_cycles(100);
-            left = 1;
-        }
+    if (P2IFG & BIT0) {
+        __delay_cycles(1000);
+        up = 1;
+    }
+    // check if button 1 is pressed
+    if (P2IFG & BIT2) {
+        __delay_cycles(1000);
+        right = 1;
+    }
+    // check if button 1 is pressed
+    if (P2IFG & BIT3) {
+        __delay_cycles(1000);
+        down = 1;
+    }
+    // check if button 1 is pressed
+    if (P2IFG & BIT4) {
+        __delay_cycles(1000);
+        left = 1;
     }
     P2IFG = 0;
     __bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
@@ -542,6 +555,7 @@ __interrupt void Port_1 (void)
     cycles = idle;
     if (P1IFG & BIT6) {
         set_led = 1;
+        __delay_cycles(100);
     }
 
     P1IFG = 0;
@@ -560,13 +574,12 @@ void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) Timer_A (void)
 #endif
 {
     // cycles is used as a delay, decrements every time isr is called until cycles = 0 then
-    //      takes the cpu out of low power mode
+    //      stops the setup phase
     if (cycles > 0) {
         --cycles;
     } else if (cycles == 0) {
-        //__bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
         --cycles;
-        //stop_setup = 1;
+        stop_setup = 1;
     }
 
 }
