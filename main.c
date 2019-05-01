@@ -237,6 +237,9 @@ unsigned int div;
 unsigned int mod;
 unsigned int flag0;
 
+static int cycles = -1;             // variable can be set to wait timer 1 cycles
+//int first_press = 1;
+int idle = 30000;
 
 unsigned int i;
 unsigned int j;
@@ -353,6 +356,15 @@ int main(void)
     P1SEL |= BIT2 + BIT4;       // Setting P1.2 and P1.4 to auxillary function
     P1SEL2 |= BIT2 + BIT4;      // Setting P1.2 and P1.4 to auxillary function
 
+
+    TA1CTL = TASSEL_2 + MC_1;           // Sets Timer A Control value to up mode and the clock source to ACLK
+    TA1CCTL1 = OUTMOD_7;                // set/reset mode
+    TA1CCTL0 = CCIE;
+    P2DIR |= BIT1 + BIT5;                            // Set P2.1 to output direction
+    P2OUT &= ~BIT5;
+    P2SEL |= BIT1;                            // Set P2.1 to the proper mode for PWM
+    TA1CCR0 = 142;                         // Sets the period at 100 Hz
+    TA1CCR1 = 0;
 
     //P2IES |= BIT0 + BIT2 + BIT3 + BIT4;
     P2IES |= BIT0 + BIT4;
@@ -593,6 +605,7 @@ __interrupt void Port_2 (void)
     //button5 is right  S2      pin 10  P2.2
 
     // check if button 1 is pressed
+    cycles = idle;
     if ((P2IFG & BIT0) && (P2IFG & BIT2) && (P2IFG & BIT3) && (P2IFG & BIT4)) {
         __delay_cycles(100);
         stop_setup = 1;
@@ -625,10 +638,49 @@ __interrupt void Port_2 (void)
 #pragma vector=PORT1_VECTOR
 __interrupt void Port_1 (void)
 {
+//    if ((P1IFG & BIT6) && ((P2IFG & BIT0) || (P2IFG & BIT2) || (P2IFG & BIT3) || (P2IFG & BIT4))) {
+//        stop_setup = 1;
+//    }
+    //
+    cycles = idle;
     if (P1IFG & BIT6) {
+        //P1IES ^= BIT6;
         set_led = 1;
     }
+//    if (first_press) {
+//        cycles = 100000;
+//        first_press = 0;
+//    } else {
+//        if (cycles < 1000) {
+//            stop_setup = 1;
+//        }
+//        first_press = 1;
+//    }
+
     P1IFG = 0;
     __bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
+}
+
+
+// Timer A0 interrupt service routine
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=TIMER1_A0_VECTOR
+__interrupt void Timer_A (void)
+#elif defined(__GNUC__)
+void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) Timer_A (void)
+#else
+#error Compiler not supported!
+#endif
+{
+    // cycles is used as a delay, decrements every time isr is called until cycles = 0 then
+    //      takes the cpu out of low power mode
+    if (cycles > 0) {
+        --cycles;
+    } else if (cycles == 0) {
+        //__bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
+        --cycles;
+        //stop_setup = 1;
+    }
+
 }
 
