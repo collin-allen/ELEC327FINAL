@@ -270,6 +270,89 @@ int set_led = 0;
 int cur_led = 20;
 
 
+void
+model_life() {
+
+    // loop forever
+    while(1) {
+        UCA0TXBUF = 0x00;                       // Dummy write to start SPI
+
+        // send start signal
+        for (i = 0; i < 4; i++) {
+            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+            UCA0TXBUF = 00000000;
+        }
+
+        // iterate over all LEDs
+        for(j = 0; j<num_leds; j++) {
+            // set these values to 0
+            num_neighbors = 0;
+            flag = 1;
+
+            for (k = 0; k < 8; k++) {
+                flag = 0b01;                    // initialize bit index position to 0
+                neighbor = neighbors[j][k];     // get the next neighbor of the current led
+                n_div16 = (neighbor>>4);        // divide the neighbor index by 16 to get the index into the state array
+                n_mod16 = (neighbor & mask);    // mod the neighbor index to get the bit position of the value in the state array
+                flag = (flag << n_mod16);       // move the single bit to the right position
+                neighborhood = current_state[n_div16];  // get the state array value that holds the state of the neighbor
+                neighbor_state = (neighborhood & flag); // get the state of the neighbor
+                state = (neighbor_state) ? 1:0;         // get the state of the neighbor
+                num_neighbors = num_neighbors + state;  // add the state of the neighbor to the number of neighbors
+
+
+            }
+
+            n_div16 = (j>>4);       // divide the index of the LED by 16 to get the index in the state array
+            n_mod16 = (j & mask);   // mod the index of the LED by 16 to get the bit of the value in the state array
+            flag = 1;               // set the bit position index to be a single bit
+            flag = flag << n_mod16; // move the single bit to the right position
+
+            // based on the number of neighbors, decide the next state according to the Game of Life rules
+            if (!(current_state[n_div16] & flag) && num_neighbors == 3){
+                // if the cell is dead but has three alive neighbors it will be on in the next round
+                next_state[n_div16] = (next_state[n_div16] | flag);
+            } else if ((current_state[n_div16] & flag) && (num_neighbors == 2 || num_neighbors == 3)) {
+                // if the cell is alive and has either two or three alive neighbors it will be alive in the next round
+                next_state[n_div16] = (next_state[n_div16] | flag);
+            } else {
+                // otherwise the cell will be dead in the next round
+                next_state[n_div16] = (next_state[n_div16] & ~flag);
+            }
+
+            // based on the state turn the led on or off
+            if (current_state[n_div16] & flag) {    // if the cell is alive turn the LED on
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
+                for (i = 0; i < 3; i++) {
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                    UCA0TXBUF = color[i];
+                }
+            } else {    // if the cell is dead turn the LED off
+                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
+                for (i = 0; i < 3; i++) {
+                    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+                    UCA0TXBUF = 0b00000001;
+                }
+            }
+       }
+
+        for (i = 0; i < 4; i++) {
+            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
+            UCA0TXBUF = 0b11111111;
+        }
+
+        for (i = 0; i < 14; i++) {
+            current_state[i] = next_state[i];
+        }
+
+        // delay so the user can see the current state of the Game
+        __delay_cycles(10000);
+
+    }
+}
+
 /**
  * main.c
  */
@@ -282,24 +365,25 @@ int main(void)
     P1SEL2 |= BIT2 + BIT4;      // Setting P1.2 and P1.4 to auxillary function
 
 
-//    TA1CTL = TASSEL_2 + MC_1;           // Sets Timer A Control value to up mode and the clock source to ACLK
-//    TA1CCTL1 = OUTMOD_7;                // set/reset mode
-//    TA1CCTL0 = CCIE;
-//    P2DIR |= BIT1 + BIT5;                            // Set P2.1 to output direction
-//    P2OUT &= ~BIT5;
-//    P2SEL |= BIT1;                            // Set P2.1 to the proper mode for PWM
-//    TA1CCR0 = 142;                         // Sets the period at 100 Hz
-//    TA1CCR1 = 0;
+    TA1CTL = TASSEL_2 + MC_1;           // Sets Timer A Control value to up mode and the clock source to ACLK
+    TA1CCTL1 = OUTMOD_7;                // set/reset mode
+    TA1CCTL0 = CCIE;
+    P2DIR |= BIT1 + BIT5;                            // Set P2.1 to output direction
+    P2OUT &= ~BIT5;
+    P2SEL |= BIT1;                            // Set P2.1 to the proper mode for PWM
+    TA1CCR0 = 142;                         // Sets the period at 100 Hz
+    TA1CCR1 = 0;
 
-    //P2IES |= BIT0 + BIT2 + BIT3 + BIT4;
-    P2IES |= BIT0 + BIT4;
-    P2IES &= ~(BIT2 + BIT3);
+    P2IES |= BIT0 + BIT2 + BIT3 + BIT4;
+    //P2IES |= BIT0 + BIT4;
+    //P2IES &= ~(BIT2 + BIT3);
     P2REN |= BIT0 + BIT2 + BIT3 + BIT4;
     P2IE  |= BIT0 + BIT2 + BIT3 + BIT4;
     P2IFG &= ~(BIT0 + BIT2 + BIT3 + BIT4);
     P2DIR &= ~(BIT0 + BIT2 + BIT3 + BIT4);
 
-    P1IES &= ~BIT6;
+    //P1IES &= ~BIT6;
+    P1IES |= BIT6;
     P1REN |= BIT6;
     P1IE  |= BIT6;
     P1IFG &= ~(BIT6);
@@ -410,89 +494,7 @@ int main(void)
 }
 
 
-void
-model_life() {
-    while(1) {
-        UCA0TXBUF = 0x00;                       // Dummy write to start SPI
 
-        for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-            UCA0TXBUF = 00000000;
-        }
-
-        //flag = 0b01;
-        for(j = 0; j<num_leds; j++) {
-            for (k = 0; k < 8; k++) {
-                flag = 0b01;
-
-                neighbor = neighbors[j][k];
-
-                n_div16 = (neighbor>>4);
-
-                n_mod16 = (neighbor & mask);
-
-                flag = (flag << n_mod16);
-
-                neighborhood = current_state[n_div16];
-
-                neighbor_state = (neighborhood & flag);
-
-                state = (neighbor_state) ? 1:0;
-
-                num_neighbors = num_neighbors + state;
-
-
-            }
-
-            //num_neighbors = 3;
-            n_div16 = (j>>4);
-            n_mod16 = (j & mask);
-            flag = 1;
-            flag = flag << n_mod16;
-
-            if (!(current_state[n_div16] & flag) && num_neighbors == 3){
-                next_state[n_div16] = (next_state[n_div16] | flag);
-            } else if ((current_state[n_div16] & flag) && (num_neighbors == 2 || num_neighbors == 3)) {
-                next_state[n_div16] = (next_state[n_div16] | flag);
-            } else {
-                next_state[n_div16] = (next_state[n_div16] & ~flag);
-            }
-
-            if (current_state[n_div16] & flag) {
-                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
-                for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-                    UCA0TXBUF = color[i];
-                }
-            } else {
-                while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-                UCA0TXBUF = brightness;                 //Buffer can hold/send 1 byte at a time
-                for (i = 0; i < 3; i++) {
-                    while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-                    UCA0TXBUF = 0b00000001;
-                }
-            }
-
-
-            num_neighbors = 0;
-            flag = 1;
-       }
-
-        for (i = 0; i < 4; i++) {
-            while (!(IFG2 & UCA0TXIFG));            // USCI_A0 RX buffer ready: polling
-            UCA0TXBUF = 0b11111111;
-        }
-
-        for (i = 0; i < 14; i++) {
-            current_state[i] = next_state[i];
-        }
-
-
-        __delay_cycles(10000);
-
-    }
-}
 
 #pragma vector=PORT2_VECTOR
 __interrupt void Port_2 (void)
@@ -504,7 +506,7 @@ __interrupt void Port_2 (void)
     //button5 is right  S2      pin 10  P2.2
 
     // check if button 1 is pressed
-    //cycles = idle;
+    cycles = idle;
     if ((P2IFG & BIT0) && (P2IFG & BIT2) && (P2IFG & BIT3) && (P2IFG & BIT4)) {
         __delay_cycles(100);
         stop_setup = 1;
@@ -537,49 +539,34 @@ __interrupt void Port_2 (void)
 #pragma vector=PORT1_VECTOR
 __interrupt void Port_1 (void)
 {
-//    if ((P1IFG & BIT6) && ((P2IFG & BIT0) || (P2IFG & BIT2) || (P2IFG & BIT3) || (P2IFG & BIT4))) {
-//        stop_setup = 1;
-//    }
-    //
     cycles = idle;
     if (P1IFG & BIT6) {
-        //P1IES ^= BIT6;
         set_led = 1;
     }
-//    if (first_press) {
-//        cycles = 100000;
-//        first_press = 0;
-//    } else {
-//        if (cycles < 1000) {
-//            stop_setup = 1;
-//        }
-//        first_press = 1;
-//    }
 
     P1IFG = 0;
     __bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
 }
 
 
-//// Timer A0 interrupt service routine
-//#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
-//#pragma vector=TIMER1_A0_VECTOR
-//__interrupt void Timer_A (void)
-//#elif defined(__GNUC__)
-//void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) Timer_A (void)
-//#else
-//#error Compiler not supported!
-//#endif
-//{
-//    // cycles is used as a delay, decrements every time isr is called until cycles = 0 then
-//    //      takes the cpu out of low power mode
-//    if (cycles > 0) {
-//        --cycles;
-//    } else if (cycles == 0) {
-//        //__bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
-//        --cycles;
-//        //stop_setup = 1;
-//    }
-//
-//}
+// Timer A0 interrupt service routine
+#if defined(__TI_COMPILER_VERSION__) || defined(__IAR_SYSTEMS_ICC__)
+#pragma vector=TIMER1_A0_VECTOR
+__interrupt void Timer_A (void)
+#elif defined(__GNUC__)
+void __attribute__ ((interrupt(TIMER1_A0_VECTOR))) Timer_A (void)
+#else
+#error Compiler not supported!
+#endif
+{
+    // cycles is used as a delay, decrements every time isr is called until cycles = 0 then
+    //      takes the cpu out of low power mode
+    if (cycles > 0) {
+        --cycles;
+    } else if (cycles == 0) {
+        //__bic_SR_register_on_exit(LPM0_bits);  // takes the CPU out of low power mode 0
+        --cycles;
+        //stop_setup = 1;
+    }
 
+}
